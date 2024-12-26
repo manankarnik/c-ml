@@ -3,6 +3,7 @@
 #include <time.h>
 #include <string.h>
 #include <math.h>
+#include <errno.h>
 
 typedef struct {
     float *weight;
@@ -99,14 +100,50 @@ void print_perceptron(Perceptron p)
     printf("bias = %f\n", p.bias);
 }
 
-int main()
+int main(int argc, char **argv)
 {
+    if (argc == 1) {
+        fprintf(stderr, "ERROR: Training file required\n");
+        return 1;
+    }
+
+    FILE *f = fopen(argv[1], "r");
+    if (f == NULL) {
+        fprintf(stderr, "ERROR: %s - %s\n", argv[1], strerror(errno));
+        return 1;
+    }
+
+    fseek(f, 0, SEEK_END);
+    size_t file_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char buffer[file_size];
+    fread(buffer, sizeof(*buffer), sizeof(buffer)/sizeof(buffer[0]), f);
+    fclose(f);
+
+    char *b = buffer;
+    size_t i = 0;
+    size_t train_output_size = 0;
+    size_t train_input_size = 0;
+    size_t line_size = strcspn(buffer, "\n");
+    float *train_input = malloc(file_size*sizeof(float));
+    float *train_output = malloc(file_size*sizeof(float));
+    while (i < file_size) {
+        if (i%(line_size + 1) != (line_size - 1)) {
+            train_input[train_input_size] = (float) atoi(b);
+            train_input_size++;
+        } else {
+            train_output[train_output_size] = (float) atoi(b);
+            train_output_size++;
+        }
+        i += 2;
+        b += 2;
+    }
+    print_array("train_input", train_input, train_input_size);
+    print_array("train_output", train_output, train_output_size);
+
     srand(time(0));
     float input[] = {1, 0};
-    float train_input[] = {0, 0, 0, 1, 1, 0, 1, 1};
-    float train_output[] = {0, 0, 0, 1};
     float learning_rate = 0.8;
-    size_t train_output_size = sizeof(train_output)/sizeof(train_output[0]);
     size_t input_size = sizeof(input)/sizeof(input[0]);
     size_t epochs = 100;
 
@@ -122,5 +159,7 @@ int main()
     float output = predict_perceptron(p, input);
     printf("output = %f\n", output);
     free_perceptron(&p);
+    free(train_input);
+    free(train_output);
     return 0;
 }
